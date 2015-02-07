@@ -196,3 +196,105 @@ function exports.createServer(onRequest)
   end)
 end
 
+local ClientRequest = Writable:extend()
+exports.ClientRequest = ClientRequest
+
+function ClientRequest:initialize(options, callback)
+  Writable.initialize(self)
+  local headers = options.headers or { }
+  local host_found
+  local i, header
+  for i, header in ipairs(headers) do
+    local key
+    p(header)
+    key = unpack(header)
+    local found = key:lower() == 'host'
+    if found then
+      host_found = found
+    end
+    table.insert(self, header)
+  end
+
+  if not host_found then
+    table.insert(self, 1, { 'host', options.host })
+  end
+
+  self.method = options.method or 'GET'
+  self.path = options.path or '/'
+  self.port = options.port or 80
+
+  local encode = codec.encoder()
+  local decode = codec.decoder()
+
+  process.nextTick(function()
+    local socket = net.Socket:new()
+    self.socket = socket
+    self:emit('socket', socket)
+
+    local buffer = ''
+    local req, res
+
+    local function flush()
+      res:push()
+      res = nil
+    end
+
+    socket:connect(options.port, options.host, function()
+      local data = encode(self)
+      socket:write(data)
+
+      socket:on('data', function(chunk)
+        -- Run the chunk through the decoder by concatenating and looping
+        buffer = buffer .. chunk
+        while true do
+          local event, extra = decode(buffer)
+          -- nil extra means the decoder needs more data, we're done here.
+          if not extra then break end
+          -- Store the leftover data.
+          buffer = extra
+          if type(event) == "table" then
+            -- If there was an old response that never closed, end it.
+            if res then flush() end
+            -- Create a new response object
+            res = IncomingMessage:new(event, socket)
+            -- Call the user callback to handle the response
+            if callback then
+              callback(res)
+            end
+            self:emit('response', res)
+          elseif res and type(event) == "string" then
+            if #event == 0 then
+              -- Empty string in http-decoder means end of body
+              -- End the res stream and remove the res reference.
+              flush()
+            else
+              -- Forward non-empty body chunks to the res stream.
+              if not res:push(event) then
+                -- If it's queue is full, pause the source stream
+                -- This will be resumed by IncomingMessage:_read
+                socket:pause()
+              end
+            end
+          end
+        end
+      end)
+      socket:on('end', function ()
+        -- Just in case the stream ended and we still had an open response,
+        -- end it.
+        if res then flush() end
+      end)
+    end)
+  end)
+end
+
+function ClientRequest:done()
+  -- self.socket:_end()
+end
+
+function exports.request(options, onResponse)
+  if type(options) == 'string' then
+    options = url.parse(options)
+  end
+  return ClientRequest:new(options, onResponse)
+end
+
