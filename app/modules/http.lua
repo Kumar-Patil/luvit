@@ -299,9 +299,12 @@ end
 function ClientRequest:done(data, cb)
   if self.socket then
     if data then
-      self:write(data, cb)
+      self:write(data, function()
+        self.socket:_end(nil, nil, cb)
+      end)
+    else
+      self.socket:_end(nil, nil, cb)
     end
-    self.socket:_end(nil, nil, cb)
   end
 end
 
