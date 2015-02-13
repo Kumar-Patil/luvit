@@ -20,6 +20,7 @@ exports.name = "luvit/http"
 exports.version = "0.1.0"
 
 local net = require('net')
+local url = require('url')
 local codec = require('http-codec')
 local Readable = require('stream').Readable
 local Writable = require('stream').Writable
@@ -224,6 +225,7 @@ function ClientRequest:initialize(options, callback)
     table.insert(self, 1, { 'host', options.host })
   end
 
+  self.host = options.host
   self.method = options.method or 'GET'
   self.path = options.path or '/'
   self.port = options.port or 80
@@ -244,7 +246,7 @@ function ClientRequest:initialize(options, callback)
       res = nil
     end
 
-    socket:connect(options.port, options.host, function()
+    socket:connect(self.port, self.host, function()
       local data = self.encode(self)
       self:write(data)
 

@@ -25,35 +25,14 @@ local body = "Hello world\n"
 
 require('tap')(function(test)
   test("http-client", function(expect)
-    local server = nil
-    local client = nil
-
-    server = http.createServer(expect(function(request, response)
-      p('server:onConnection req', request)
-      assert(request.method == "GET")
-      assert(request.url == "/foo")
-      -- Fixed because header parsing is not busted anymore
-      assert(request.headers.bar == "cats")
-      p('server:onConnection bare resp', response)
-      response:setHeader("Content-Type", "text/plain")
-      response:setHeader("Content-Length", #body)
-      response:finish(body)
-    end))
-
-    server:listen(PORT, HOST, function()
-      local req = http.request({
-        host = HOST,
-        port = PORT,
-        path = "/foo",
-        headers = {{"bar", "cats"}}
-        }, function(response)
-          p('client:onResponse', response)
-          assert(response.statusCode == 200)
-          assert(response.httpVersion == '1.1')
-          server:close()
+    http.get('http://luvit.io', expect(function (res)
+      assert(res.statusCode == 301)
+      assert(res.httpVersion == '1.1')
+      res:on('data', function (chunk)
+        p("ondata", {chunk=chunk})
       end)
-      req:done()
-    end)
+    end))
   end)
 end)
+
 
