@@ -37,8 +37,15 @@ function IncomingMessage:initialize(head, socket)
     headers[name:lower()] = value
   end
   self.headers = headers
-  self.method = head.method
-  self.url = head.path
+  if head.method then
+    -- server specific
+    self.method = head.method
+    self.url = head.path
+  else
+    -- client specific
+    self.statusCode = head.code
+    self.statusMessage = head.reason
+  end
   self.socket = socket
 end
 
@@ -155,7 +162,6 @@ function exports.handleConnection(socket, onRequest)
     while true do
       local event, extra = decode(buffer)
       -- nil extra means the decoder needs more data, we're done here.
-      p('s event', event)
       if not extra then break end
       -- Store the leftover data.
       buffer = extra
@@ -206,9 +212,7 @@ function ClientRequest:initialize(options, callback)
   local host_found
   local i, header
   for i, header in ipairs(headers) do
-    local key
-    p(header)
-    key = unpack(header)
+    local key = unpack(header)
     local found = key:lower() == 'host'
     if found then
       host_found = found
@@ -242,7 +246,6 @@ function ClientRequest:initialize(options, callback)
 
     socket:connect(options.port, options.host, function()
       local data = self.encode(self)
-      p(data)
       self:write(data)
 
       socket:on('data', function(chunk)
@@ -251,7 +254,6 @@ function ClientRequest:initialize(options, callback)
         while true do
           local event, extra = self.decode(buffer)
           -- nil extra means the decoder needs more data, we're done here.
-          p('c event', event, 'extra', extra)
           if not extra then break end
           -- Store the leftover data.
           buffer = extra
@@ -299,7 +301,7 @@ function ClientRequest:done(data, cb)
     if data then
       self:write(data, cb)
     end
-    self.socket:_end()
+    self.socket:_end(nil, nil, cb)
   end
 end
 
@@ -308,5 +310,17 @@ function exports.request(options, onResponse)
     options = url.parse(options)
   end
   return ClientRequest:new(options, onResponse)
+end
+
+function exports.get(options, onResponse)
+  if type(options) == 'string' then
+    options = url.parse(options)
+  end
+  options.method = 'GET'
+  local client = exports.request(options, onResponse)
+  process.nextTick(function()
+    client:done()
+  end)
+  return client
 end
 

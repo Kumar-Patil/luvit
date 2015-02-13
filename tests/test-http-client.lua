@@ -18,33 +18,42 @@ limitations under the License.
 
 local http = require('http')
 
-local HOST = '127.0.0.1'
-local PORT = 10082
+local HOST = "127.0.0.1"
+local PORT = process.env.PORT or 10082
 
 local body = "Hello world\n"
 
 require('tap')(function(test)
   test("http-client", function(expect)
-    function onServerConnection(req, res)
-      res:setHeader("Content-Type", "text/plain")
-      res:setHeader("Content-Length", #body)
-      res:finish(body)
-    end
+    local server = nil
+    local client = nil
 
-    function onResp(resp)
-      p('resp:on("complete")')
+    server = http.createServer(expect(function(request, response)
+      p('server:onConnection req', request)
+      assert(request.method == "GET")
+      assert(request.url == "/foo")
+      -- Fixed because header parsing is not busted anymore
+      assert(request.headers.bar == "cats")
+      p('server:onConnection bare resp', response)
+      response:setHeader("Content-Type", "text/plain")
+      response:setHeader("Content-Length", #body)
+      response:finish(body)
+    end))
 
-      function onData(data)
-        p('resp:on("data")', data)
-        assert(data == body)
-      end
-
-      resp:on('data', expect(onData))
-    end
-
-    local server = http.createServer(onServerConnection)
-    server:listen(PORT)
-    local client = http.request({port=PORT, host=HOST}, onResp)
-    client:done()
+    server:listen(PORT, HOST, function()
+      local req = http.request({
+        host = HOST,
+        port = PORT,
+        path = "/foo",
+        headers = {{"bar", "cats"}}
+        }, function(response)
+          p('client:onResponse', response)
+          assert(response.statusCode == 200)
+          assert(response.httpVersion == '1.1')
+          server:close()
+      end)
+      req:done()
+    end)
   end)
 end)
+
