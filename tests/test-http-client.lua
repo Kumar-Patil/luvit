@@ -42,8 +42,9 @@ require('tap')(function(test)
       resp:on('data', expect(onData))
     end
 
-    http.createServer(onServerConnection):listen(PORT)
-
-    http.request({port=PORT, host=HOST}, onResp)
+    local server = http.createServer(onServerConnection)
+    server:listen(PORT)
+    local client = http.request({port=PORT, host=HOST}, onResp)
+    client:done()
   end)
 end)

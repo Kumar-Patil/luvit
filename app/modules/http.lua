@@ -155,6 +155,7 @@ function exports.handleConnection(socket, onRequest)
     while true do
       local event, extra = decode(buffer)
       -- nil extra means the decoder needs more data, we're done here.
+      p('s event', event)
       if not extra then break end
       -- Store the leftover data.
       buffer = extra
@@ -223,8 +224,8 @@ function ClientRequest:initialize(options, callback)
   self.path = options.path or '/'
   self.port = options.port or 80
 
-  local encode = codec.encoder()
-  local decode = codec.decoder()
+  self.encode = codec.encoder()
+  self.decode = codec.decoder()
 
   process.nextTick(function()
     local socket = net.Socket:new()
@@ -240,15 +241,17 @@ function ClientRequest:initialize(options, callback)
     end
 
     socket:connect(options.port, options.host, function()
-      local data = encode(self)
-      socket:write(data)
+      local data = self.encode(self)
+      p(data)
+      self:write(data)
 
       socket:on('data', function(chunk)
         -- Run the chunk through the decoder by concatenating and looping
         buffer = buffer .. chunk
         while true do
-          local event, extra = decode(buffer)
+          local event, extra = self.decode(buffer)
           -- nil extra means the decoder needs more data, we're done here.
+          p('c event', event, 'extra', extra)
           if not extra then break end
           -- Store the leftover data.
           buffer = extra
@@ -287,8 +290,17 @@ function ClientRequest:initialize(options, callback)
   end)
 end
 
-function ClientRequest:done()
-  -- self.socket:_end()
+function ClientRequest:write(data, cb)
+  self.socket:write(self.encode(data), cb)
+end
+
+function ClientRequest:done(data, cb)
+  if self.socket then
+    if data then
+      self:write(data, cb)
+    end
+    self.socket:_end()
+  end
 end
 
 function exports.request(options, onResponse)
