@@ -154,9 +154,11 @@ end
 local builtinLoader = package.loaders[1]
 local base_path = process.cwd()
 local libpath = process.execPath:match('^(.*)' .. path.sep .. '[^' ..path.sep.. ']+' ..path.sep.. '[^' ..path.sep.. ']+$') ..path.sep.. 'lib' ..path.sep.. 'luvit' ..path.sep
-local bundled_paths = {"modules", "node_modules"}
+--local bundled_paths = {"modules", "node_modules"}
+local bundled_paths = {"modules"}
 function module.require(filepath, dirname)
-  if not dirname then dirname = base_path end
+--  if not dirname then dirname = base_path end
+  dirname = base_path
 
   -- Let module paths always use / even on windows
   filepath = filepath:gsub("/", path.sep)
@@ -169,12 +171,13 @@ function module.require(filepath, dirname)
     absolute_path = path.join(dirname, filepath)
   end
   if absolute_path then
-    local loader = loadModule(absolute_path)
-    if type(loader) == "function" then
-      return loader()
-    else
-      error("Failed to find module '" .. filepath .."'")
-    end
+    error("Specifying paths to modules is not supported")
+--    local loader = loadModule(absolute_path)
+--    if type(loader) == "function" then
+--      return loader()
+--    else
+--      error("Failed to find module '" .. filepath .."'")
+--    end
   end
 
   local errors = {}
@@ -195,25 +198,25 @@ function module.require(filepath, dirname)
 
   -- Library modules
 
-  local loader = loadModule(libpath .. filepath)
-  if type(loader) == "function" then
-    return loader()
-  else
-    errors[#errors + 1] = loader
-  end
+--  local loader = loadModule(libpath .. filepath)
+--  if type(loader) == "function" then
+--    return loader()
+--  else
+--    errors[#errors + 1] = loader
+--  end
 
   -- zip bundled modules
-  if zip then
-    loader = loadModule("zip:" .. filepath)
-    if type(loader) == "function" then
-      return loader()
-    end
-    errors[#errors + 1] = loader
-  end
+--  if zip then
+--    loader = loadModule("zip:" .. filepath)
+--    if type(loader) == "function" then
+--      return loader()
+--    end
+--    errors[#errors + 1] = loader
+--  end
 
   -- Bundled path modules
   local dir = dirname .. path.sep
-  repeat
+--  repeat
     local loader
     for _, bundled_path in ipairs(bundled_paths) do
       local full_path = path.join(dir, bundled_path, filepath)
@@ -223,8 +226,8 @@ function module.require(filepath, dirname)
       end
       errors[#errors + 1] = loader
     end
-    dir = path.dirname(dir)
-  until dir == "."
+--    dir = path.dirname(dir)
+--  until dir == "."
 
   error("Failed to find module '" .. filepath .."'" .. table.concat(errors, ""))
 
