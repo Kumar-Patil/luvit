@@ -3,6 +3,9 @@ YAJL_MAJOR=2
 YAJL_MINOR=0
 YAJL_MICRO=5
 
+CC?=cc
+AR?=ar
+
 OBJECTS=build/yajl.o         \
         build/yajl_lex.o     \
         build/yajl_parser.o  \
@@ -30,7 +33,7 @@ build:
 	mkdir -p build
 
 yajl.a: ${OBJECTS}
-	ar rcs yajl.a ${OBJECTS}
+	$(AR) rcs yajl.a ${OBJECTS}
 
 src/api/yajl:
 	ln -s . src/api/yajl

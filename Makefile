@@ -1,9 +1,9 @@
 ### OPTIONS ###
 # export the following variables to use the system libraries
 # instead of the bundled ones:
-#   USE_SYSTEM_SSL=1
+USE_SYSTEM_SSL=1
 #   USE_SYSTEM_LUAJIT=1
-#   USE_SYSTEM_ZLIB=1
+USE_SYSTEM_ZLIB=1
 #   USE_SYSTEM_YAJL=1
 #
 # default is to use the bundled libraries
@@ -29,6 +29,8 @@ SSLDIR=deps/openssl
 BUILDDIR=build
 CRYPTODIR=deps/luacrypto
 CARESDIR=deps/cares
+
+BUILD_NUMBER?=0
 
 PREFIX?=/usr/local
 BINDIR?=${DESTDIR}${PREFIX}/bin
@@ -63,6 +65,13 @@ else ifeq (${OS_NAME},Linux)
 LDFLAGS+=-Wl,-E
 else ifeq (${OS_NAME},FreeBSD)
 LDFLAGS+=-lkvm -Wl,-E
+ifeq "$(shell which gcc)" ""
+export CC=cc
+MAKEFLAGS+=-e
+endif
+else ifeq (${OS_NAME},SunOS)
+CFLAGS+=-D__EXTENSIONS__
+LUAMAKEFLAGS=-e
 endif
 # LUAJIT CONFIGURATION #
 #XCFLAGS=-g
@@ -72,14 +81,15 @@ XCFLAGS+=-DLUAJIT_ENABLE_LUA52COMPAT
 export XCFLAGS
 # verbose build
 export Q=
-MAKEFLAGS+=-e
+#MAKEFLAGS+=-e
+YAJLA_CFLAGS="--std=c99"
 
 LDFLAGS+=-L${BUILDDIR}
 LIBS += -lluvit -lpthread
 
 ifeq (${USE_SYSTEM_ZLIB},1)
-CPPFLAGS+=$(shell pkg-config --cflags zlib)
-LIBS+=$(shell pkg-config --libs zlib)
+CPPFLAGS+=-I../zlib
+LIBS+=../zlib/libz.a
 else
 CPPFLAGS+=-I${ZLIBDIR}
 LIBS+=${ZLIBDIR}/libz.a
@@ -108,16 +118,18 @@ LIBS += -lm
 
 ifeq (${USE_SYSTEM_SSL},1)
 CFLAGS+=-Wall -w
-CPPFLAGS+=$(shell pkg-config --cflags openssl)
-LIBS+=$(shell pkg-config --libs openssl)
+CPPFLAGS+=-I../openssl/include
+LIBS+=../openssl/libssl.a ../openssl/libcrypto.a
 else
 CPPFLAGS+=-I${SSLDIR}/openssl/include
 LIBS+=${SSLDIR}/libopenssl.a
 endif
 
-
 ifeq (${OS_NAME},Linux)
 LIBS+=-lrt -ldl
+endif
+ifeq (${OS_NAME},SunOS)
+LIBS+=-lsocket -lkstat -lnsl -lsendfile
 endif
 
 CPPFLAGS += -DUSE_OPENSSL
@@ -209,7 +221,7 @@ ${LUADIR}/Makefile:
 
 ${LUADIR}/src/libluajit.a: ${LUADIR}/Makefile
 	touch -c ${LUADIR}/src/*.h
-	$(MAKE) -C ${LUADIR}
+	$(MAKE) -C ${LUADIR} ${LUAMAKEFLAGS}
 
 ${YAJLDIR}/CMakeLists.txt:
 	git submodule update --init ${YAJLDIR}
@@ -220,7 +232,7 @@ ${YAJLDIR}/Makefile: deps/Makefile.yajl ${YAJLDIR}/CMakeLists.txt
 ${YAJLDIR}/yajl.a: ${YAJLDIR}/Makefile
 	rm -rf ${YAJLDIR}/src/yajl
 	cp -r ${YAJLDIR}/src/api ${YAJLDIR}/src/yajl
-	$(MAKE) -C ${YAJLDIR}
+	CFLAGS="${CFLAGS} ${YAJLA_CFLAGS}" $(MAKE) -C ${YAJLDIR}
 
 ${UVDIR}/Makefile:
 	git submodule update --init ${UVDIR}
@@ -264,7 +276,8 @@ ${BUILDDIR}/%.o: src/%.c ${DEPS}
 		-DHTTP_VERSION=\"${HTTP_VERSION}\" \
 		-DUV_VERSION=\"${UV_VERSION}\" \
 		-DYAJL_VERSIONISH=\"${YAJL_VERSION}\" \
-		-DLUVIT_VERSION=\"${VERSION}\" \
+		-DLUVIT_BASE_VERSION=\"${VERSION}\" \
+		-DLUVIT_VERSION=\"${VERSION}:${BUILD_NUMBER}\" \
 		-DLUAJIT_VERSION=\"${LUAJIT_VERSION}\"
 
 ${BUILDDIR}/libluvit.a: ${CRYPTODIR}/Makefile ${LUVLIBS} ${DEPS}
@@ -278,8 +291,8 @@ ${CRYPTODIR}/src/lcrypto.o: ${CRYPTODIR}/Makefile
 	${CC} ${CPPFLAGS} -c -o ${CRYPTODIR}/src/lcrypto.o -I${CRYPTODIR}/src/ \
 		 -I${LUADIR}/src/ ${CRYPTODIR}/src/lcrypto.c
 
-${BUILDDIR}/luvit: ${BUILDDIR}/libluvit.a ${BUILDDIR}/luvit_main.o ${CRYPTODIR}/src/lcrypto.o
-	$(CC) ${CPPFLAGS} ${CFLAGS} ${LDFLAGS} -o ${BUILDDIR}/luvit ${BUILDDIR}/luvit_main.o ${BUILDDIR}/libluvit.a \
+${BUILDDIR}/luvit: ${BUILDDIR}/libluvit.a ${BUILDDIR}/luvit_main.o ${BUILDDIR}/luvit_newmain.o ${CRYPTODIR}/src/lcrypto.o
+	$(CC) ${CPPFLAGS} ${CFLAGS} ${LDFLAGS} -o ${BUILDDIR}/luvit ${BUILDDIR}/luvit_main.o ${BUILDDIR}/luvit_newmain.o ${BUILDDIR}/libluvit.a \
 		${CRYPTODIR}/src/lcrypto.o ${LIBS}
 
 clean:
@@ -323,9 +336,10 @@ bundle: bundle/luvit
 bundle/luvit: build/luvit ${BUILDDIR}/libluvit.a ${BUNDLE_LIBS}
 	build/luvit tools/bundler.lua
 	cd bundle; $(CC) --std=c89 -g -Wall -Werror -c *.c
-	$(CC) --std=c89 -D_GNU_SOURCE -g -Wall -Werror -DBUNDLE -c src/luvit_exports.c -o bundle/luvit_exports.o -I${HTTPDIR} -I${UVDIR}/include -I${LUADIR}/src -I${YAJLDIR}/src/api -I${YAJLDIR}/src -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -DHTTP_VERSION=\"${HTTP_VERSION}\" -DUV_VERSION=\"${UV_VERSION}\" -DYAJL_VERSIONISH=\"${YAJL_VERSION}\" -DLUVIT_VERSION=\"${VERSION}\" -DLUAJIT_VERSION=\"${LUAJIT_VERSION}\"
-	$(CC) --std=c89 -D_GNU_SOURCE -g -Wall -Werror -DBUNDLE -c src/luvit_main.c -o bundle/luvit_main.o -I${HTTPDIR} -I${UVDIR}/include -I${LUADIR}/src -I${YAJLDIR}/src/api -I${YAJLDIR}/src -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -DHTTP_VERSION=\"${HTTP_VERSION}\" -DUV_VERSION=\"${UV_VERSION}\" -DYAJL_VERSIONISH=\"${YAJL_VERSION}\" -DLUVIT_VERSION=\"${VERSION}\" -DLUAJIT_VERSION=\"${LUAJIT_VERSION}\"
-	$(CC) ${LDFLAGS} -g -o bundle/luvit ${BUILDDIR}/libluvit.a `ls bundle/*.o` ${LIBS} ${CRYPTODIR}/src/lcrypto.o
+	$(CC) --std=c89 -D_GNU_SOURCE -g -Wall -Werror -DBUNDLE -c src/luvit_exports.c -o bundle/luvit_exports.o -I${HTTPDIR} -I${UVDIR}/include -I${LUADIR}/src -I${YAJLDIR}/src/api -I${YAJLDIR}/src -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -DHTTP_VERSION=\"${HTTP_VERSION}\" -DUV_VERSION=\"${UV_VERSION}\" -DYAJL_VERSIONISH=\"${YAJL_VERSION}\" -DLUVIT_VERSION=\"${VERSION}:${BUILD_NUMBER}\" -DLUAJIT_VERSION=\"${LUAJIT_VERSION}\"
+	$(CC) --std=c89 -D_GNU_SOURCE -g -Wall -Werror -DBUNDLE -c src/luvit_main.c -o bundle/luvit_main.o -I${HTTPDIR} -I${UVDIR}/include -I${LUADIR}/src -I${YAJLDIR}/src/api -I${YAJLDIR}/src -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -DHTTP_VERSION=\"${HTTP_VERSION}\" -DUV_VERSION=\"${UV_VERSION}\" -DYAJL_VERSIONISH=\"${YAJL_VERSION}\" -DLUVIT_VERSION=\"${VERSION}:${BUILD_NUMBER}\" -DLUAJIT_VERSION=\"${LUAJIT_VERSION}\" -I${CARESDIR}/include
+	$(CC) --std=c89 -D_GNU_SOURCE -g -Wall -Werror -DBUNDLE -c src/luvit_newmain.c -o bundle/luvit_newmain.o -I${HTTPDIR} -I${UVDIR}/include -I${LUADIR}/src -I${YAJLDIR}/src/api -I${YAJLDIR}/src -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -DHTTP_VERSION=\"${HTTP_VERSION}\" -DUV_VERSION=\"${UV_VERSION}\" -DYAJL_VERSIONISH=\"${YAJL_VERSION}\" -DLUVIT_VERSION=\"${VERSION}:${BUILD_NUMBER}\" -DLUAJIT_VERSION=\"${LUAJIT_VERSION}\" -I${CARESDIR}/include
+	$(CC) ${LDFLAGS} -g -o bundle/luvit ${BUILDDIR}/libluvit.a `ls bundle/*.o` ${CRYPTODIR}/src/lcrypto.o ${LIBS}
 
 # Test section
 
@@ -362,8 +376,7 @@ dist_build:
             -e 's/^LUAJIT_VERSION=.*/LUAJIT_VERSION=${LUAJIT_VERSION}/' \
             -e 's/^UV_VERSION=.*/UV_VERSION=${UV_VERSION}/' \
             -e 's/^HTTP_VERSION=.*/HTTP_VERSION=${HTTP_VERSION}/' \
-            -e 's/^YAJL_VERSION=.*/YAJL_VERSION=${YAJL_VERSION}/' \
-	    -e '/^WERROR/s/1/0/' < Makefile > Makefile.dist
+            -e 's/^YAJL_VERSION=.*/YAJL_VERSION=${YAJL_VERSION}/' < Makefile > Makefile.dist
 	sed -e 's/LUVIT_VERSION=".*/LUVIT_VERSION=\"${VERSION}\"'\'',/' \
             -e 's/LUAJIT_VERSION=".*/LUAJIT_VERSION=\"${LUAJIT_VERSION}\"'\'',/' \
             -e 's/UV_VERSION=".*/UV_VERSION=\"${UV_VERSION}\"'\'',/' \
@@ -372,10 +385,9 @@ dist_build:
 
 tarball: dist_build
 	rm -rf ${DIST_FOLDER} ${DIST_FILE}
-	mkdir -p ${DIST_DIR}
-	git clone . ${DIST_FOLDER}
-	cp deps/gitmodules.local ${DIST_FOLDER}/.gitmodules
-	cd ${DIST_FOLDER} ; git submodule update --init
+	mkdir -p ${DIST_FOLDER}
+	cp -a . ${DIST_FOLDER}
+	cd ${DIST_FOLDER}
 	find ${DIST_FOLDER} -name ".git*" | xargs rm -r
 	mv Makefile.dist ${DIST_FOLDER}/Makefile
 	mv luvit.gyp.dist ${DIST_FOLDER}/luvit.gyp

@@ -86,8 +86,8 @@ FS.mkdir("bundle", "0755", function (err)
     end
   end
 
-  FS.writeFile(Path.join("src", "luvit_exports.c"), exports_c, pend())
-  FS.writeFile(Path.join("src", "luvit_exports.h"), exports_h, pend())
+  -- FS.writeFile(Path.join("src", "luvit_exports.c"), exports_c, pend())
+  -- FS.writeFile(Path.join("src", "luvit_exports.h"), exports_h, pend())
   for i, file in ipairs(files) do
     ChildProcess.execFile(Path.join("deps", "luajit", "src", "luajit"), {"-bg", Path.join("lib", "luvit", file), Path.join("bundle", names[i] .. ".c")}, {}, pend())
   end

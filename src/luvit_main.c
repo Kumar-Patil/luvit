@@ -36,7 +36,11 @@
 #include "luvit_exports.h"
 #endif
 
-int main(int argc, char *argv[])
+const char *luvit_version_int(void) {
+  return LUVIT_VERSION;
+}
+
+int luvit_main(int argc, char *argv[])
 {
   lua_State *L;
   uv_loop_t *loop;
