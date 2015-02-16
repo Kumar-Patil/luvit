@@ -32,10 +32,10 @@ open build/libluvitb.a
 addlib deps/uv/libuv.a
 addlib deps/cares/libcares.a
 addlib deps/luajit/src/libluajit.a
-addlib deps/zlib/libz.a
 addlib deps/yajl/yajl.a
 addlib ../openssl/libssl.a
 addlib ../openssl/libcrypto.a
+addlib ../zlib/libz.a
 save
 end
 EOF

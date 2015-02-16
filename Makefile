@@ -3,7 +3,7 @@
 # instead of the bundled ones:
 USE_SYSTEM_SSL=1
 #   USE_SYSTEM_LUAJIT=1
-#   USE_SYSTEM_ZLIB=1
+USE_SYSTEM_ZLIB=1
 #   USE_SYSTEM_YAJL=1
 #
 # default is to use the bundled libraries
@@ -88,8 +88,8 @@ LDFLAGS+=-L${BUILDDIR}
 LIBS += -lluvit -lpthread
 
 ifeq (${USE_SYSTEM_ZLIB},1)
-CPPFLAGS+=$(shell pkg-config --cflags zlib)
-LIBS+=$(shell pkg-config --libs zlib)
+CPPFLAGS+=-I../zlib
+LIBS+=../zlib/libz.a
 else
 CPPFLAGS+=-I${ZLIBDIR}
 LIBS+=${ZLIBDIR}/libz.a

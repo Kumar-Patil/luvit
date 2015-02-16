@@ -16,3 +16,4 @@ Release/
 *.suo
 *.vcxproj
 *.vcxproj.*
+Makefile.dist
