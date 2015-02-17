@@ -12,7 +12,7 @@
 	ignore = dirty
 [submodule "deps/yajl"]
 	path = deps/yajl
-	url = https://github.com/boundary/yajl.git
+	url = https://github.com/lloyd/yajl.git
 	ignore = dirty
 [submodule "deps/zlib"]
 	path = deps/zlib
@@ -32,4 +32,4 @@
 	ignore = dirty
 [submodule "deps/cares"]
 	path = deps/cares
-	url = https://github.com/piscisaureus/cares
+	url = https://github.com/boundary/cares

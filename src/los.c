@@ -17,7 +17,9 @@
 
 #ifndef WIN32
 #include <unistd.h>
+#if 0
 #include <sys/utsname.h>
+#endif
 #endif
 #include "los.h"
 #include "luv_misc.h"
