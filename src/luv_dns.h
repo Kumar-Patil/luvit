@@ -21,7 +21,11 @@
 #include "lua.h"
 #include "lauxlib.h"
 #include "uv.h"
+
+#define CARES_STATICLIB
 #include "ares.h"
+#undef CARES_STATICLIB
+
 #include "utils.h"
 
 /* Wrapped functions exposed to lua */

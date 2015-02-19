@@ -53,8 +53,16 @@ ifeq (${WERROR},1)
 CFLAGS += -Werror
 endif
 
+ifneq (${WIN32_TARGET},)
+LUAMAKEFLAGS=HOST_CC='gcc -m32' CROSS=$(WIN32_TARGET)- TARGET_SYS=Windows BUILDMODE=static
+CARESFLAGS=OS="mingw"
+UVFLAGS=PLATFORM="mingw" PREFIX=$(WIN32_TARGET)-
+CFLAGS += -DWIN32
+LUAJITEXE=luajit.exe
+else
 OS_NAME=$(shell uname -s)
 MH_NAME=$(shell uname -m)
+LUAJITEXE=luajit
 ifeq (${OS_NAME},Darwin)
 ifeq (${MH_NAME},x86_64)
 LDFLAGS+=-framework CoreServices -framework Carbon -pagezero_size 10000 -image_base 100000000
@@ -72,6 +80,7 @@ endif
 else ifeq (${OS_NAME},SunOS)
 CFLAGS+=-D__EXTENSIONS__
 LUAMAKEFLAGS=-e
+endif
 endif
 # LUAJIT CONFIGURATION #
 #XCFLAGS=-g
@@ -127,9 +136,10 @@ endif
 
 ifeq (${OS_NAME},Linux)
 LIBS+=-lrt -ldl
-endif
-ifeq (${OS_NAME},SunOS)
+else ifeq (${OS_NAME},SunOS)
 LIBS+=-lsocket -lkstat -lnsl -lsendfile
+else ifneq (${WIN32_TARGET},)
+LIBS+=-lws2_32 -lpsapi -liphlpapi -lgdi32
 endif
 
 CPPFLAGS += -DUSE_OPENSSL
@@ -232,25 +242,25 @@ ${YAJLDIR}/Makefile: deps/Makefile.yajl ${YAJLDIR}/CMakeLists.txt
 ${YAJLDIR}/yajl.a: ${YAJLDIR}/Makefile
 	rm -rf ${YAJLDIR}/src/yajl
 	cp -r ${YAJLDIR}/src/api ${YAJLDIR}/src/yajl
-	CFLAGS="${CFLAGS} ${YAJLA_CFLAGS}" $(MAKE) -C ${YAJLDIR}
+	CFLAGS="${CFLAGS} ${YAJLA_CFLAGS}" CC=$(CC) AR=$(AR) $(MAKE) -C ${YAJLDIR}
 
 ${UVDIR}/Makefile:
 	git submodule update --init ${UVDIR}
 
 ${UVDIR}/libuv.a: ${UVDIR}/Makefile
-	$(MAKE) -C ${UVDIR}
+	$(MAKE) $(UVFLAGS) -C ${UVDIR}
 
 ${CARESDIR}/Makefile:
 	git submodule update --init --recursive
 
 ${CARESDIR}/libcares.a: ${CARESDIR}/Makefile
-	$(MAKE) -C ${CARESDIR}
+	 CC=$(CC) AR=$(AR) $(CARESFLAGS) $(MAKE) -C ${CARESDIR}
 
 ${HTTPDIR}/Makefile:
 	git submodule update --init ${HTTPDIR}
 
 ${HTTPDIR}/http_parser.o: ${HTTPDIR}/Makefile
-	$(MAKE) -C ${HTTPDIR} http_parser.o
+	 CC=$(CC) AR=$(AR) $(MAKE) -C ${HTTPDIR} http_parser.o
 
 ${ZLIBDIR}/zlib.gyp:
 	git submodule update --init ${ZLIBDIR}
@@ -334,7 +344,8 @@ uninstall:
 bundle: bundle/luvit
 
 bundle/luvit: build/luvit ${BUILDDIR}/libluvit.a ${BUNDLE_LIBS}
-	build/luvit tools/bundler.lua
+	mkdir 755 bundle
+	@for f in `ls lib/luvit/*.lua`; do ./deps/luajit/src/$(LUAJITEXE) -bg $${f} bundle/`basename $${f}|sed 's/\.lua/\.c/'`; done
 	cd bundle; $(CC) --std=c89 -g -Wall -Werror -c *.c
 	$(CC) --std=c89 -D_GNU_SOURCE -g -Wall -Werror -DBUNDLE -c src/luvit_exports.c -o bundle/luvit_exports.o -I${HTTPDIR} -I${UVDIR}/include -I${LUADIR}/src -I${YAJLDIR}/src/api -I${YAJLDIR}/src -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -DHTTP_VERSION=\"${HTTP_VERSION}\" -DUV_VERSION=\"${UV_VERSION}\" -DYAJL_VERSIONISH=\"${YAJL_VERSION}\" -DLUVIT_VERSION=\"${VERSION}:${BUILD_NUMBER}\" -DLUAJIT_VERSION=\"${LUAJIT_VERSION}\"
 	$(CC) --std=c89 -D_GNU_SOURCE -g -Wall -Werror -DBUNDLE -c src/luvit_main.c -o bundle/luvit_main.o -I${HTTPDIR} -I${UVDIR}/include -I${LUADIR}/src -I${YAJLDIR}/src/api -I${YAJLDIR}/src -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -DHTTP_VERSION=\"${HTTP_VERSION}\" -DUV_VERSION=\"${UV_VERSION}\" -DYAJL_VERSIONISH=\"${YAJL_VERSION}\" -DLUVIT_VERSION=\"${VERSION}:${BUILD_NUMBER}\" -DLUAJIT_VERSION=\"${LUAJIT_VERSION}\" -I${CARESDIR}/include

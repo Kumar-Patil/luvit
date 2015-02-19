@@ -21,7 +21,10 @@
 #include "lua.h"
 #include "lauxlib.h"
 #include "uv.h"
+
+#define CARES_STATICLIB
 #include "ares.h"
+#undef CARES_STATICLIB
 
 /* C doesn't have booleans on it's own */
 #ifndef FALSE
