@@ -4,12 +4,15 @@
 local fs = require('fs')
 local json = require('json')
 
-local boundary = {param = nil}
+local boundary = {argv = nil, param = nil}
 
 -- import param.json data into a Lua table (boundary.param)
 local json_blob
 if (pcall(function () json_blob = fs.readFileSync("param.json") end)) then
   pcall(function () boundary.param = json.parse(json_blob) end)
 end
+
+-- create table of cmdline args (boundary.argv)
+boundary.argv = process.argv or nil
 
 return boundary
