@@ -1,9 +1,9 @@
 ### OPTIONS ###
 # export the following variables to use the system libraries
 # instead of the bundled ones:
-USE_SYSTEM_SSL=1
+#   USE_SYSTEM_SSL=1
 #   USE_SYSTEM_LUAJIT=1
-USE_SYSTEM_ZLIB=1
+#   USE_SYSTEM_ZLIB=1
 #   USE_SYSTEM_YAJL=1
 #
 # default is to use the bundled libraries
@@ -42,6 +42,13 @@ USE_SYSTEM_SSL?=0
 USE_SYSTEM_LUAJIT?=0
 USE_SYSTEM_ZLIB?=0
 USE_SYSTEM_YAJL?=0
+
+ifeq (${USE_METER_SSL},1)
+USE_SYSTEM_SSL=1
+endif
+ifeq (${USE_METER_ZLIB},1)
+USE_SYSTEM_ZLIB=1
+endif
 
 DEBUG ?= 1
 ifeq (${DEBUG},1)
@@ -97,8 +104,13 @@ LDFLAGS+=-L${BUILDDIR}
 LIBS += -lluvit -lpthread
 
 ifeq (${USE_SYSTEM_ZLIB},1)
+ifeq (${USE_METER_ZLIB},1)
 CPPFLAGS+=-I../zlib
 LIBS+=../zlib/libz.a
+else
+CPPFLAGS+=$(shell pkg-config --cflags zlib)
+LIBS+=$(shell pkg-config --libs zlib)
+endif
 else
 CPPFLAGS+=-I${ZLIBDIR}
 LIBS+=${ZLIBDIR}/libz.a
@@ -127,8 +139,13 @@ LIBS += -lm
 
 ifeq (${USE_SYSTEM_SSL},1)
 CFLAGS+=-Wall -w
+ifeq (${USE_METER_SSL},1)
 CPPFLAGS+=-I../openssl/include
 LIBS+=../openssl/libssl.a ../openssl/libcrypto.a
+else
+CPPFLAGS+=$(shell pkg-config --cflags openssl)
+LIBS+=$(shell pkg-config --libs openssl)
+endif
 else
 CPPFLAGS+=-I${SSLDIR}/openssl/include
 LIBS+=${SSLDIR}/libopenssl.a
@@ -344,7 +361,7 @@ uninstall:
 bundle: bundle/luvit
 
 bundle/luvit: build/luvit ${BUILDDIR}/libluvit.a ${BUNDLE_LIBS}
-	mkdir 755 bundle
+	mkdir -m 755 bundle
 	@for f in `ls lib/luvit/*.lua`; do ./deps/luajit/src/$(LUAJITEXE) -bg $${f} bundle/`basename $${f}|sed 's/\.lua/\.c/'`; done
 	cd bundle; $(CC) --std=c89 -g -Wall -Werror -c *.c
 	$(CC) --std=c89 -D_GNU_SOURCE -g -Wall -Werror -DBUNDLE -c src/luvit_exports.c -o bundle/luvit_exports.o -I${HTTPDIR} -I${UVDIR}/include -I${LUADIR}/src -I${YAJLDIR}/src/api -I${YAJLDIR}/src -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -DHTTP_VERSION=\"${HTTP_VERSION}\" -DUV_VERSION=\"${UV_VERSION}\" -DYAJL_VERSIONISH=\"${YAJL_VERSION}\" -DLUVIT_VERSION=\"${VERSION}:${BUILD_NUMBER}\" -DLUAJIT_VERSION=\"${LUAJIT_VERSION}\"
