@@ -60,6 +60,8 @@ ifeq (${WERROR},1)
 CFLAGS += -Werror
 endif
 
+INSTALL_CMD=install
+CC_AR_CMDS=CC=$(CC) AR=$(AR)
 ifneq (${WIN32_TARGET},)
 LUAMAKEFLAGS=HOST_CC='gcc -m32' CROSS=$(WIN32_TARGET)- TARGET_SYS=Windows BUILDMODE=static
 CARESFLAGS=OS="mingw"
@@ -87,6 +89,8 @@ endif
 else ifeq (${OS_NAME},SunOS)
 CFLAGS+=-D__EXTENSIONS__
 LUAMAKEFLAGS=-e
+INSTALL_CMD=bsdinstall
+CC_AR_CMDS=
 endif
 endif
 # LUAJIT CONFIGURATION #
@@ -259,7 +263,7 @@ ${YAJLDIR}/Makefile: deps/Makefile.yajl ${YAJLDIR}/CMakeLists.txt
 ${YAJLDIR}/yajl.a: ${YAJLDIR}/Makefile
 	rm -rf ${YAJLDIR}/src/yajl
 	cp -r ${YAJLDIR}/src/api ${YAJLDIR}/src/yajl
-	CFLAGS="${CFLAGS} ${YAJLA_CFLAGS}" CC=$(CC) AR=$(AR) $(MAKE) -C ${YAJLDIR}
+	CFLAGS="${CFLAGS} ${YAJLA_CFLAGS}" $(CC_AR_CMDS) $(MAKE) -C ${YAJLDIR}
 
 ${UVDIR}/Makefile:
 	git submodule update --init ${UVDIR}
@@ -271,13 +275,13 @@ ${CARESDIR}/Makefile:
 	git submodule update --init --recursive
 
 ${CARESDIR}/libcares.a: ${CARESDIR}/Makefile
-	 CC=$(CC) AR=$(AR) $(CARESFLAGS) $(MAKE) -C ${CARESDIR}
+	 $(CC_AR_CMDS) $(CARESFLAGS) $(MAKE) -C ${CARESDIR}
 
 ${HTTPDIR}/Makefile:
 	git submodule update --init ${HTTPDIR}
 
 ${HTTPDIR}/http_parser.o: ${HTTPDIR}/Makefile
-	 CC=$(CC) AR=$(AR) $(MAKE) -C ${HTTPDIR} http_parser.o
+	 $(CC_AR_CMDS) $(MAKE) -C ${HTTPDIR} http_parser.o
 
 ${ZLIBDIR}/zlib.gyp:
 	git submodule update --init ${ZLIBDIR}
@@ -336,7 +340,7 @@ clean:
 
 install: all
 	mkdir -p ${BINDIR}
-	install ${BUILDDIR}/luvit ${BINDIR}/luvit
+	$(INSTALL_CMD) ${BUILDDIR}/luvit ${BINDIR}/luvit
 	mkdir -p ${LIBDIR}
 	cp lib/luvit/*.lua ${LIBDIR}
 	mkdir -p ${INCDIR}/http_parser
