@@ -72,7 +72,7 @@ int luvit_main(int argc, char *argv[])
 
   /* Run the main lua script */
   if (luvit_run(L)) {
-    printf("%s\n", lua_tostring(L, -1));
+    fprintf(stderr, "%s\n", lua_tostring(L, -1));
     lua_pop(L, 1);
     lua_close(L);
     return -1;
