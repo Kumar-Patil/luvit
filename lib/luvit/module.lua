@@ -171,13 +171,16 @@ function module.require(filepath, dirname)
     absolute_path = path.join(dirname, filepath)
   end
   if absolute_path then
-    error("Specifying paths to modules is not supported")
---    local loader = loadModule(absolute_path)
---    if type(loader) == "function" then
---      return loader()
---    else
---      error("Failed to find module '" .. filepath .."'")
---    end
+    if filepath:sub(1, 2) == "./" then
+      local loader = loadModule(absolute_path)
+      if type(loader) == "function" then
+        return loader()
+      else
+        error("Failed to find module '" .. filepath .."'")
+      end
+    else
+      error("Only module paths beginnig with './' are supported")
+    end
   end
 
   local errors = {}
