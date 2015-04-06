@@ -406,7 +406,9 @@ assert(xpcall(function ()
   end
 
   if file then
-    assert(require('module').myloadfile(require('path').resolve(process.cwd(), file)))()
+    if require('module').myloadfile(require('path').resolve(process.cwd(), file)) == nil then
+      realAssert(nil, "file "..file.." not found")
+    end
   elseif not (native.handleType(0) == "TTY") then
     process.stdin:on("data", function(line)
       repl.evaluateLine(line)
