@@ -25,6 +25,11 @@ module.
 local core = {}
 
 --[[
+Ensure we reference the correct 'debug' expected below.
+]]
+local debug = require('utils').debug
+
+--[[
 Returns whether obj is instance of class or not.
 
     local object = Object:new()
