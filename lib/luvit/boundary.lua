@@ -4,7 +4,7 @@
 local fs = require('fs')
 local json = require('json')
 
-local boundary = {argv = nil, param = nil}
+local boundary = {argv = nil, param = nil, plugin = {}}
 local plugin_basedir = "."
 
 -- create table of cmdline args (boundary.argv)
@@ -23,6 +23,12 @@ end
 local json_blob
 if (pcall(function () json_blob = fs.readFileSync(plugin_basedir.."/param.json") end)) then
   pcall(function () boundary.param = json.parse(json_blob) end)
+end
+if (pcall(function () json_blob = fs.readFileSync("./plugin.json") end)) then
+  pcall(function () boundary.plugin = json.parse(json_blob) end)
+end
+for i, key_name in ipairs({'version', 'name'}) do
+  boundary.plugin[key_name] = boundary.plugin[key_name] or "unspecified"
 end
 
 return boundary
