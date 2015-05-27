@@ -3,6 +3,7 @@
 -- @file boundary.lua
 local fs = require('fs')
 local json = require('json')
+local path = require('path')
 
 local boundary = {argv = nil, param = nil, plugin = {}}
 local plugin_basedir = "."
@@ -27,8 +28,14 @@ end
 if (pcall(function () json_blob = fs.readFileSync("./plugin.json") end)) then
   pcall(function () boundary.plugin = json.parse(json_blob) end)
 end
-for i, key_name in ipairs({'version', 'name'}) do
-  boundary.plugin[key_name] = boundary.plugin[key_name] or "unspecified"
+-- set defaults if version and name are not present
+boundary.plugin.version = boundary.plugin.version or "0.0"
+if boundary.plugin.name == nil then
+  local cwd = process.cwd()
+  boundary.plugin.name = path.basename(cwd)
+  if boundary.plugin.name == "plugin" then
+    boundary.plugin.name = path.basename(path.dirname(cwd))
+  end
 end
 
 return boundary
